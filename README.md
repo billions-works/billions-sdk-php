@@ -24,6 +24,8 @@ $currencies = $api->getCurrencies();
 $invoice = $api->createInvoice([
     'currency' => 'USDT',
     'amount' => 100,
+    'idempotencyKey' => 'checkout-attempt-123',
+    'order_no' => 'ORDER-123',
     'callbackUrl' => 'https://example.com/webhook',
 ]);
 
@@ -54,9 +56,18 @@ $api->getMerchantInfo();
 $api->estimateFees($payload);
 $api->createInvoice($payload);
 $api->getInvoice($invoiceId);
+$api->getInvoicesByOrderNo($orderNo);
 $api->verifyInvoicePaid($invoiceId, $callbackData);
 $api->verifyInvoicePaid($callbackDataWithId);
 ```
+
+`createInvoice()` accepts an optional `idempotencyKey`. Repeating the request with
+the same key returns the invoice already associated with that key. Use `order_no`
+for your business order reference and `getInvoicesByOrderNo()` to recover invoices
+for that order.
+
+Invoice responses include `amount`, `final_amount`, `merchant_fee`,
+`merchant_receive_amount`, and `paid_amount`.
 
 API objects are returned as associative arrays so their field names remain identical
 to the TypeScript SDK and API JSON.
@@ -96,4 +107,3 @@ so `100`, `100.0`, and `100.000000000000000000` are equivalent.
 composer install
 composer test
 ```
-

@@ -91,11 +91,17 @@ final class BillionsApi
      *   currency: string,
      *   amount: int|float|string,
      *   type?: 'b2b'|'b2c',
-     *   orderId?: string,
+     *   order_no?: string,
      *   description?: string,
      *   autoconvert?: string
      * } $payload
-     * @return array{amount: int|float, finalPrice: int|float, fee: int|float}
+     * @return array{
+     *   amount: int|float,
+     *   finalPrice: int|float,
+     *   fee: int|float,
+     *   merchantReceiveAmount: int|float,
+     *   summaryFee?: int|float
+     * }
      */
     public function estimateFees(array $payload): array
     {
@@ -108,7 +114,8 @@ final class BillionsApi
      *   currency: string,
      *   amount: int|float|string,
      *   type?: 'b2b'|'b2c',
-     *   orderId?: string,
+     *   idempotencyKey?: string,
+     *   order_no?: string,
      *   description?: string,
      *   autoconvert?: string,
      *   callbackUrl?: string,
@@ -132,6 +139,22 @@ final class BillionsApi
 
         /** @var array<string, mixed> */
         return $this->request('GET', '/invoices/' . rawurlencode($invoiceId));
+    }
+
+    /**
+     * Returns every invoice belonging to the current merchant with the given order number.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getInvoicesByOrderNo(string $orderNo): array
+    {
+        $orderNo = trim($orderNo);
+        if ($orderNo === '') {
+            throw new InvalidArgumentException('order_no is required');
+        }
+
+        /** @var list<array<string, mixed>> */
+        return $this->request('GET', '/invoices/byOrder/' . rawurlencode($orderNo));
     }
 
     /**

@@ -74,6 +74,8 @@ final class BillionsApiTest extends TestCase
         $result = $api->createInvoice([
             'currency' => 'USDT',
             'amount' => 100,
+            'idempotencyKey' => 'attempt-42',
+            'order_no' => 'ORDER-42',
             'callbackUrl' => 'https://example.com/webhook',
         ]);
 
@@ -83,6 +85,8 @@ final class BillionsApiTest extends TestCase
             [
                 'currency' => 'USDT',
                 'amount' => 100,
+                'idempotencyKey' => 'attempt-42',
+                'order_no' => 'ORDER-42',
                 'callbackUrl' => 'https://example.com/webhook',
             ],
             json_decode((string) $history[0]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR),
@@ -100,6 +104,27 @@ final class BillionsApiTest extends TestCase
             'https://example.test/public/v1/invoices/invoice%2F42',
             (string) $history[0]['request']->getUri(),
         );
+    }
+
+    public function testGetInvoicesByOrderNoEncodesOrderNumber(): void
+    {
+        $history = [];
+        $api = $this->apiWithResponses([new Response(200, [], '[]')], $history);
+
+        self::assertSame([], $api->getInvoicesByOrderNo(' ORDER/42 '));
+        self::assertSame(
+            'https://example.test/public/v1/invoices/byOrder/ORDER%2F42',
+            (string) $history[0]['request']->getUri(),
+        );
+    }
+
+    public function testGetInvoicesByOrderNoRequiresValue(): void
+    {
+        $api = $this->apiWithResponses([]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('order_no is required');
+        $api->getInvoicesByOrderNo(' ');
     }
 
     public function testApiErrorExposesStatusAndResponseBody(): void
@@ -196,7 +221,9 @@ final class BillionsApiTest extends TestCase
             'currency' => 'USDT_TRON',
             'convert_currency' => null,
             'amount' => '101.000000000000000000',
+            'final_amount' => '101.000000000000000000',
             'merchant_fee' => '1.000000000000000000',
+            'merchant_receive_amount' => '100.000000000000000000',
             'paid_amount' => '100.000000000000000000',
             'callback_url' => 'https://example.com/webhook',
             'order_no' => '123321',
