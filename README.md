@@ -57,8 +57,9 @@ $api->estimateFees($payload);
 $api->createInvoice($payload);
 $api->getInvoice($invoiceId);
 $api->getInvoicesByOrderNo($orderNo);
+$api->getInvoiceFromWebhook($webhook);
 $api->verifyInvoicePaid($invoiceId, $callbackData);
-$api->verifyInvoicePaid($callbackDataWithId);
+$api->verifyInvoicePaid($webhookOrLegacyCallback);
 ```
 
 `createInvoice()` accepts an optional `idempotencyKey`. Repeating the request with
@@ -74,6 +75,15 @@ to the TypeScript SDK and API JSON.
 
 ## Callback verification
 
+Current webhooks contain `event`, retry metadata, and canonical invoice fields in
+the nested `data` object. Top-level invoice fields are transitional duplicates.
+
+Use the webhook only as a wake-up signal for any invoice status:
+
+```php
+$invoice = $api->getInvoiceFromWebhook($webhook);
+```
+
 Always retrieve the invoice from the API before trusting a payment callback:
 
 ```php
@@ -81,18 +91,15 @@ use Billions\Exception\CallbackVerificationException;
 use Billions\Exception\InvoiceNotPaidException;
 
 try {
-    $verifiedInvoice = $api->verifyInvoicePaid([
-        'id' => $_POST['id'],
-        'status' => $_POST['status'],
-        'paid_amount' => $_POST['paid_amount'],
-    ]);
+    $verifiedInvoice = $api->verifyInvoicePaid($webhook);
 } catch (InvoiceNotPaidException | CallbackVerificationException $exception) {
     // Reject or postpone callback processing.
 }
 ```
 
-The method checks that the API invoice is `completed`, then compares its status and
-paid amount with the callback. Decimal strings are normalized before comparison,
+The method accepts the current envelope and legacy `{id, status, paid_amount}` data,
+checks that the API invoice is `completed`, then compares its status and paid amount.
+Decimal strings are normalized before comparison,
 so `100`, `100.0`, and `100.000000000000000000` are equivalent.
 
 ## Errors

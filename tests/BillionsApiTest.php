@@ -162,6 +162,48 @@ final class BillionsApiTest extends TestCase
         self::assertSame($invoice, $result);
     }
 
+    public function testVerifyInvoicePaidAcceptsWebhookEnvelope(): void
+    {
+        $invoice = $this->completedInvoice();
+        $api = $this->apiWithResponses(
+            [new Response(200, [], json_encode($invoice, JSON_THROW_ON_ERROR))],
+        );
+
+        $result = $api->verifyInvoicePaid([
+            'event' => 'invoice.paid',
+            'event_timestamp' => '2026-08-04T09:42:08.189Z',
+            'attempt' => 1,
+            'previous_attempt_timestamp' => null,
+            'data' => [
+                'invoice_id' => 'invoice-id',
+                'status' => 'completed',
+                'paid_amount' => '100.000',
+            ],
+        ]);
+
+        self::assertSame($invoice, $result);
+    }
+
+    public function testGetInvoiceFromWebhookSupportsIntermediateStatus(): void
+    {
+        $history = [];
+        $invoice = $this->completedInvoice();
+        $invoice['status'] = 'processing';
+        $invoice['paid_amount'] = '0';
+        $api = $this->apiWithResponses(
+            [new Response(200, [], json_encode($invoice, JSON_THROW_ON_ERROR))],
+            $history,
+        );
+
+        $result = $api->getInvoiceFromWebhook([
+            'event' => 'invoice.status_changed',
+            'data' => ['invoice_id' => 'invoice-id'],
+        ]);
+
+        self::assertSame('processing', $result['status']);
+        self::assertStringEndsWith('/invoices/invoice-id', (string) $history[0]['request']->getUri());
+    }
+
     public function testVerifyInvoicePaidRejectsUnpaidInvoice(): void
     {
         $invoice = $this->completedInvoice();

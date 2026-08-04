@@ -160,28 +160,29 @@ final class BillionsApi
     /**
      * Supports both TS-compatible forms:
      *   verifyInvoicePaid('invoice-id', $callback)
-     *   verifyInvoicePaid($callbackWithId)
+     *   verifyInvoicePaid($callbackWithIdOrWebhookEnvelope)
      *
-     * @param string|array{id?: string, status: string, paid_amount: int|float|string} $invoiceIdOrCallback
-     * @param array{id?: string, status: string, paid_amount: int|float|string}|null $callbackData
+     * @param string|array<string, mixed> $invoiceIdOrCallback
+     * @param array<string, mixed>|null $callbackData
      * @return array<string, mixed>
      */
     public function verifyInvoicePaid(string|array $invoiceIdOrCallback, ?array $callbackData = null): array
     {
         if (is_string($invoiceIdOrCallback)) {
             $invoiceId = trim($invoiceIdOrCallback);
-            $callback = $callbackData;
+            $rawCallback = $callbackData;
         } else {
-            $invoiceId = trim((string) ($invoiceIdOrCallback['id'] ?? ''));
-            $callback = $invoiceIdOrCallback;
+            $invoiceId = self::extractWebhookInvoiceId($invoiceIdOrCallback);
+            $rawCallback = $invoiceIdOrCallback;
         }
 
         if ($invoiceId === '') {
             throw new InvalidArgumentException('invoice id is required');
         }
-        if ($callback === null) {
+        if ($rawCallback === null) {
             throw new InvalidArgumentException('callback data is required');
         }
+        $callback = self::extractWebhookData($rawCallback);
 
         $invoice = $this->getInvoice($invoiceId);
 
@@ -201,6 +202,22 @@ final class BillionsApi
         }
 
         return $invoice;
+    }
+
+    /**
+     * Retrieves authoritative invoice state for a current webhook envelope or legacy callback.
+     *
+     * @param array<string, mixed> $webhook
+     * @return array<string, mixed>
+     */
+    public function getInvoiceFromWebhook(array $webhook): array
+    {
+        $invoiceId = self::extractWebhookInvoiceId($webhook);
+        if ($invoiceId === '') {
+            throw new InvalidArgumentException('invoice id is required');
+        }
+
+        return $this->getInvoice($invoiceId);
     }
 
     private function buildUrl(string $path): string
@@ -277,5 +294,29 @@ final class BillionsApi
         $normalized = $fractionPart !== '' ? "{$integerPart}.{$fractionPart}" : $integerPart;
 
         return $negative && $normalized !== '0' ? "-{$normalized}" : $normalized;
+    }
+
+    /** @param array<string, mixed> $webhook */
+    private static function extractWebhookInvoiceId(array $webhook): string
+    {
+        $data = self::extractWebhookData($webhook);
+        $invoiceId = trim((string) ($data['invoice_id'] ?? ''));
+        if ($invoiceId !== '') {
+            return $invoiceId;
+        }
+
+        $invoiceId = trim((string) ($webhook['invoice_id'] ?? ''));
+        return $invoiceId !== '' ? $invoiceId : trim((string) ($webhook['id'] ?? ''));
+    }
+
+    /**
+     * @param array<string, mixed> $webhook
+     * @return array<string, mixed>
+     */
+    private static function extractWebhookData(array $webhook): array
+    {
+        return isset($webhook['data']) && is_array($webhook['data'])
+            ? $webhook['data']
+            : $webhook;
     }
 }
