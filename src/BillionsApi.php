@@ -18,6 +18,7 @@ final class BillionsApi
     public readonly string $apiKey;
     public readonly string $baseUrl;
     public readonly string $version;
+    public readonly ?string $webhookSecret;
 
     private readonly ClientInterface $httpClient;
 
@@ -26,10 +27,14 @@ final class BillionsApi
         ?string $baseUrl = null,
         ?string $version = null,
         ?ClientInterface $httpClient = null,
+        ?string $webhookSecret = null,
     ) {
         $apiKey = trim($apiKey);
         if ($apiKey === '') {
             throw new InvalidArgumentException('apiKey is required');
+        }
+        if ($webhookSecret === '') {
+            throw new InvalidArgumentException('webhookSecret must not be empty');
         }
 
         $rawBaseUrl = trim($baseUrl ?? '');
@@ -42,6 +47,7 @@ final class BillionsApi
         $this->apiKey = $apiKey;
         $this->baseUrl = $normalizedBaseUrl;
         $this->version = $normalizedVersion !== '' ? $normalizedVersion : Constants::PUBLIC_API_VERSION;
+        $this->webhookSecret = $webhookSecret;
         $this->httpClient = $httpClient ?? new Client();
     }
 
@@ -227,6 +233,21 @@ final class BillionsApi
         }
 
         return $this->getInvoice($invoiceId);
+    }
+
+    public function verifyWebhookSignature(string $signature, string $body): bool
+    {
+        if ($this->webhookSecret === null) {
+            throw new InvalidArgumentException('webhookSecret is required to verify webhook signatures');
+        }
+
+        $normalizedSignature = preg_replace('/^sha256=/i', '', trim($signature));
+        if (!is_string($normalizedSignature) || preg_match('/^[a-f0-9]{64}$/i', $normalizedSignature) !== 1) {
+            return false;
+        }
+
+        $expectedSignature = hash_hmac('sha256', $body, $this->webhookSecret);
+        return hash_equals($expectedSignature, strtolower($normalizedSignature));
     }
 
     private function buildUrl(string $path): string

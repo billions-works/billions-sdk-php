@@ -35,6 +35,27 @@ final class BillionsApiTest extends TestCase
         self::assertSame('https://api.billions.works', $api->baseUrl);
     }
 
+    public function testVerifyWebhookSignature(): void
+    {
+        $body = '{"event":"invoice.paid"}';
+        $signature = hash_hmac('sha256', $body, 'whsec_test');
+        $api = new BillionsApi('secret', webhookSecret: 'whsec_test');
+
+        self::assertTrue($api->verifyWebhookSignature($signature, $body));
+        self::assertTrue($api->verifyWebhookSignature('sha256=' . strtoupper($signature), $body));
+        self::assertFalse($api->verifyWebhookSignature(str_repeat('0', 64), $body));
+        self::assertFalse($api->verifyWebhookSignature('invalid', $body));
+    }
+
+    public function testVerifyWebhookSignatureRequiresSecret(): void
+    {
+        $api = new BillionsApi('secret');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('webhookSecret is required');
+        $api->verifyWebhookSignature(str_repeat('0', 64), '{}');
+    }
+
     public function testApiKeyIsRequired(): void
     {
         $this->expectException(InvalidArgumentException::class);

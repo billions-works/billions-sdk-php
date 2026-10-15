@@ -17,7 +17,10 @@ require 'vendor/autoload.php';
 
 use Billions\BillionsApi;
 
-$api = new BillionsApi('your-api-key');
+$api = new BillionsApi(
+    apiKey: 'your-api-key',
+    webhookSecret: 'your-webhook-secret',
+);
 
 $version = $api->getVersion();
 $currencies = $api->getCurrencies();
@@ -60,6 +63,7 @@ $api->createInvoice($payload);
 $api->getInvoice($invoiceId);
 $api->getInvoicesByOrderNo($orderNo);
 $api->getInvoiceFromWebhook($webhook);
+$api->verifyWebhookSignature($signatureHeader, $rawBody);
 $api->verifyInvoicePaid($invoiceId, $callbackData);
 $api->verifyInvoicePaid($webhookOrLegacyCallback);
 ```
@@ -80,6 +84,11 @@ to the TypeScript SDK and API JSON.
 
 Current webhooks contain `event`, retry metadata, and canonical invoice fields in
 the nested `data` object. Top-level invoice fields are transitional duplicates.
+
+`verifyWebhookSignature()` verifies an HMAC-SHA256 hex signature against the exact
+raw request body. It accepts plain hex and `sha256=<hex>` formats and uses a
+timing-safe comparison. Call it before decoding JSON; re-encoding parsed JSON can
+change whitespace or key order and invalidate the signature.
 
 Use the webhook only as a wake-up signal for any invoice status:
 
