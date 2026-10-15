@@ -115,6 +115,35 @@ final class BillionsApiTest extends TestCase
         );
     }
 
+    public function testCreateWithdrawalSignsRequest(): void
+    {
+        $history = [];
+        $mock = new MockHandler([new Response(200, [], '{"request":{"id":"request-id"}}')]);
+        $handler = HandlerStack::create($mock);
+        $handler->push(Middleware::history($history));
+        $api = new BillionsApi(
+            'api-key',
+            'https://example.test',
+            'v1',
+            new Client(['handler' => $handler]),
+            secretKey: 'secret-key',
+        );
+        $payload = ['currency' => 'EUR', 'amount' => '70', 'withdrawalMethodId' => 123];
+        $requestId = '123e4567-e89b-42d3-a456-426614174000';
+        $timestamp = 1_800_000_000;
+
+        $api->createWithdrawal($payload, $requestId, $timestamp);
+
+        $request = $history[0]['request'];
+        self::assertSame((string) $timestamp, $request->getHeaderLine('x-billions-timestamp'));
+        self::assertSame($requestId, $request->getHeaderLine('x-billions-request-id'));
+        self::assertSame(
+            'v1=e4373734cf57c01ee1d98a82245e9f2df9f204c3e52beb3ff3a095427ae936d8',
+            $request->getHeaderLine('x-billions-request-signature'),
+        );
+        self::assertSame('https://example.test/public/v1/withdrawals/create', (string) $request->getUri());
+    }
+
     public function testGetCountriesUsesExpectedEndpoint(): void
     {
         $history = [];

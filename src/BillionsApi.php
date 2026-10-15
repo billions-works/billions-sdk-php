@@ -20,6 +20,7 @@ final class BillionsApi
     public readonly string $baseUrl;
     public readonly string $version;
     public readonly ?string $webhookSecret;
+    public readonly ?string $secretKey;
 
     private readonly ClientInterface $httpClient;
 
@@ -29,6 +30,7 @@ final class BillionsApi
         ?string $version = null,
         ?ClientInterface $httpClient = null,
         ?string $webhookSecret = null,
+        ?string $secretKey = null,
     ) {
         $apiKey = trim($apiKey);
         if ($apiKey === '') {
@@ -36,6 +38,12 @@ final class BillionsApi
         }
         if ($webhookSecret === '') {
             throw new InvalidArgumentException('webhookSecret must not be empty');
+        }
+        if ($secretKey === '') {
+            throw new InvalidArgumentException('secretKey must not be empty');
+        }
+        if ($webhookSecret !== null && $secretKey !== null && $webhookSecret !== $secretKey) {
+            throw new InvalidArgumentException('secretKey and webhookSecret must match when both are provided');
         }
 
         $rawBaseUrl = trim($baseUrl ?? '');
@@ -48,7 +56,8 @@ final class BillionsApi
         $this->apiKey = $apiKey;
         $this->baseUrl = $normalizedBaseUrl;
         $this->version = $normalizedVersion !== '' ? $normalizedVersion : Constants::PUBLIC_API_VERSION;
-        $this->webhookSecret = $webhookSecret;
+        $this->secretKey = $secretKey ?? $webhookSecret;
+        $this->webhookSecret = $this->secretKey;
         $this->httpClient = $httpClient ?? new Client();
     }
 
@@ -143,6 +152,24 @@ final class BillionsApi
     {
         /** @var array<string, mixed> */
         return $this->request('POST', '/invoices/create', $payload);
+    }
+
+    /** @return array{request: array<string, mixed>} */
+    public function createWithdrawal(array $payload, ?string $requestId = null, int|string|null $timestamp = null): array
+    {
+        return $this->signedMutation('/withdrawals/create', $payload, $requestId, $timestamp);
+    }
+
+    /** @return array{request: array<string, mixed>} */
+    public function refundCrypto(array $payload, ?string $requestId = null, int|string|null $timestamp = null): array
+    {
+        return $this->signedMutation('/refunds/refundCrypto', $payload, $requestId, $timestamp);
+    }
+
+    /** @return array{request: array<string, mixed>} */
+    public function refundFiat(array $payload, ?string $requestId = null, int|string|null $timestamp = null): array
+    {
+        return $this->signedMutation('/refunds/refundFiat', $payload, $requestId, $timestamp);
     }
 
     /** @return array<string, mixed> */
@@ -262,12 +289,13 @@ final class BillionsApi
         return sprintf('%s/public/%s%s', $this->baseUrl, $this->version, $path);
     }
 
-    private function request(string $method, string $path, ?array $payload = null): mixed
+    private function request(string $method, string $path, ?array $payload = null, array $headers = []): mixed
     {
         $options = [
             'headers' => [
                 'Content-Type' => 'application/json',
                 'x-api-key' => $this->apiKey,
+                ...$headers,
             ],
             'http_errors' => false,
         ];
@@ -298,6 +326,39 @@ final class BillionsApi
         }
 
         return $responseBody;
+    }
+
+    /** @return array{request: array<string, mixed>} */
+    private function signedMutation(
+        string $path,
+        array $payload,
+        ?string $requestId,
+        int|string|null $timestamp,
+    ): array {
+        if ($this->secretKey === null) {
+            throw new InvalidArgumentException('secretKey is required for signed operations');
+        }
+        $timestamp = (string) ($timestamp ?? time());
+        $requestId = strtolower(trim($requestId ?? self::uuidV4()));
+        $canonicalBody = JsonCanonicalizatorFactory::getInstance()->canonicalize((object) $payload);
+        $message = "POST\n/public/{$this->version}{$path}\n{$timestamp}\n{$requestId}\n{$canonicalBody}";
+        $signature = hash_hmac('sha256', $message, $this->secretKey);
+
+        /** @var array{request: array<string, mixed>} */
+        return $this->request('POST', $path, $payload, [
+            'x-billions-timestamp' => $timestamp,
+            'x-billions-request-id' => $requestId,
+            'x-billions-request-signature' => "v1={$signature}",
+        ]);
+    }
+
+    private static function uuidV4(): string
+    {
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        $hex = bin2hex($bytes);
+        return sprintf('%s-%s-%s-%s-%s', substr($hex, 0, 8), substr($hex, 8, 4), substr($hex, 12, 4), substr($hex, 16, 4), substr($hex, 20));
     }
 
     private function safeJsonDecode(string $value): mixed

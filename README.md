@@ -19,7 +19,7 @@ use Billions\BillionsApi;
 
 $api = new BillionsApi(
     apiKey: 'your-api-key',
-    webhookSecret: 'your-webhook-secret',
+    secretKey: 'your-api-secret-key',
 );
 
 $version = $api->getVersion();
@@ -60,6 +60,9 @@ $api->getCountries();
 $api->getMerchantInfo();
 $api->estimateFees($payload);
 $api->createInvoice($payload);
+$api->createWithdrawal($payload, $requestId);
+$api->refundCrypto($payload, $requestId);
+$api->refundFiat($payload, $requestId);
 $api->getInvoice($invoiceId);
 $api->getInvoicesByOrderNo($orderNo);
 $api->getInvoiceFromWebhook($webhook);
@@ -79,6 +82,10 @@ Invoice responses include `amount`, `final_amount`, `merchant_fee`,
 
 API objects are returned as associative arrays so their field names remain identical
 to the TypeScript SDK and API JSON.
+
+The three money-operation methods generate RFC 8785/JCS request signatures. Their
+optional request ID should be retained and reused with the identical body after a
+lost response; using a new ID may create a second operation.
 
 ## Callback verification
 
