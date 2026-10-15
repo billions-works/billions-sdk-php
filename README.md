@@ -21,6 +21,7 @@ $api = new BillionsApi('your-api-key');
 
 $version = $api->getVersion();
 $currencies = $api->getCurrencies();
+$countries = $api->getCountries();
 $invoice = $api->createInvoice([
     'currency' => 'USDT',
     'amount' => 100,
@@ -52,6 +53,7 @@ $api = new BillionsApi(
 ```php
 $api->getVersion();
 $api->getCurrencies();
+$api->getCountries();
 $api->getMerchantInfo();
 $api->estimateFees($payload);
 $api->createInvoice($payload);
@@ -68,6 +70,7 @@ for your business order reference and `getInvoicesByOrderNo()` to recover invoic
 for that order.
 
 Invoice responses include `amount`, `final_amount`, `merchant_fee`,
+`network_and_other_fees`,
 `merchant_receive_amount`, and `paid_amount`.
 
 API objects are returned as associative arrays so their field names remain identical

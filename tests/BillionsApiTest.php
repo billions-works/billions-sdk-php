@@ -93,6 +93,22 @@ final class BillionsApiTest extends TestCase
         );
     }
 
+    public function testGetCountriesUsesExpectedEndpoint(): void
+    {
+        $history = [];
+        $countries = [['code' => 'US', 'name' => 'United States']];
+        $api = $this->apiWithResponses(
+            [new Response(200, [], json_encode($countries, JSON_THROW_ON_ERROR))],
+            $history,
+        );
+
+        self::assertSame($countries, $api->getCountries());
+        self::assertSame(
+            'https://example.test/public/v1/countries',
+            (string) $history[0]['request']->getUri(),
+        );
+    }
+
     public function testGetInvoiceEncodesId(): void
     {
         $history = [];
@@ -265,6 +281,7 @@ final class BillionsApiTest extends TestCase
             'amount' => '101.000000000000000000',
             'final_amount' => '101.000000000000000000',
             'merchant_fee' => '1.000000000000000000',
+            'network_and_other_fees' => '0.250000000000000000',
             'merchant_receive_amount' => '100.000000000000000000',
             'paid_amount' => '100.000000000000000000',
             'callback_url' => 'https://example.com/webhook',

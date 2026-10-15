@@ -70,6 +70,15 @@ final class BillionsApi
     }
 
     /**
+     * @return list<array{code: string, name: string}>
+     */
+    public function getCountries(): array
+    {
+        /** @var list<array{code: string, name: string}> */
+        return $this->request('GET', '/countries');
+    }
+
+    /**
      * @return array{
      *   id: string,
      *   email: string,
@@ -121,7 +130,7 @@ final class BillionsApi
      *   callbackUrl?: string,
      *   expiresAt?: string
      * } $payload
-     * @return array<string, mixed>
+     * @return array<string, mixed> Includes network_and_other_fees.
      */
     public function createInvoice(array $payload): array
     {
