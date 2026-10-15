@@ -37,12 +37,13 @@ final class BillionsApiTest extends TestCase
 
     public function testVerifyWebhookSignature(): void
     {
-        $body = '{"event":"invoice.paid"}';
-        $signature = hash_hmac('sha256', $body, 'whsec_test');
-        $api = new BillionsApi('secret', webhookSecret: 'whsec_test');
+        $body = '{"status":"completed","message":"Заказ\/1"}';
+        $signature = 'f5aaad7e7c75acd4dd679d9a58f708d37fb061bfa7bfd2f12117992715153e92';
+        $secret = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+        $api = new BillionsApi('secret', webhookSecret: $secret);
 
         self::assertTrue($api->verifyWebhookSignature($signature, $body));
-        self::assertTrue($api->verifyWebhookSignature('sha256=' . strtoupper($signature), $body));
+        self::assertTrue($api->verifyWebhookSignature('jcs-sha256=' . strtoupper($signature), $body));
         self::assertFalse($api->verifyWebhookSignature(str_repeat('0', 64), $body));
         self::assertFalse($api->verifyWebhookSignature('invalid', $body));
     }

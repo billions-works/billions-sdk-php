@@ -12,6 +12,7 @@ use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use InvalidArgumentException;
 use JsonException;
+use Mmccook\JsonCanonicalizator\JsonCanonicalizatorFactory;
 
 final class BillionsApi
 {
@@ -241,12 +242,18 @@ final class BillionsApi
             throw new InvalidArgumentException('webhookSecret is required to verify webhook signatures');
         }
 
-        $normalizedSignature = preg_replace('/^sha256=/i', '', trim($signature));
+        $normalizedSignature = preg_replace('/^jcs-sha256=/i', '', trim($signature));
         if (!is_string($normalizedSignature) || preg_match('/^[a-f0-9]{64}$/i', $normalizedSignature) !== 1) {
             return false;
         }
 
-        $expectedSignature = hash_hmac('sha256', $body, $this->webhookSecret);
+        try {
+            $decodedBody = json_decode($body, false, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return false;
+        }
+        $canonicalBody = JsonCanonicalizatorFactory::getInstance()->canonicalize($decodedBody);
+        $expectedSignature = hash_hmac('sha256', $canonicalBody, $this->webhookSecret);
         return hash_equals($expectedSignature, strtolower($normalizedSignature));
     }
 

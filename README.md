@@ -85,10 +85,11 @@ to the TypeScript SDK and API JSON.
 Current webhooks contain `event`, retry metadata, and canonical invoice fields in
 the nested `data` object. Top-level invoice fields are transitional duplicates.
 
-`verifyWebhookSignature()` verifies an HMAC-SHA256 hex signature against the exact
-raw request body. It accepts plain hex and `sha256=<hex>` formats and uses a
-timing-safe comparison. Call it before decoding JSON; re-encoding parsed JSON can
-change whitespace or key order and invalidate the signature.
+`verifyWebhookSignature()` parses the body, canonicalizes the JSON according to
+RFC 8785 (JCS), and verifies its HMAC-SHA256 signature. It accepts plain hex and
+`jcs-sha256=<hex>` formats and uses a timing-safe comparison. JSON whitespace,
+property order, and equivalent escaping do not affect verification. Pass the
+original API `secretKey` as `webhookSecret`; it is used as UTF-8 text.
 
 Use the webhook only as a wake-up signal for any invoice status:
 
